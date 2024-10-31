@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  greeter_server:
+    image: gotogrpc/greeter_server:1.0.0
+    ports:
+      - "50051:50051"  # Port for gRPC service
+      - "8080:8080"    # Port for metrics
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "2"
+          memory: "2G"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+      - influxdb2
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - default
+
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"  # Port for Prometheus UI
+    networks:
+      - default
+
+  influxdb2:
+    image: influxdb:2
+    ports:
+      - 8086:8086
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin12345
+      - DOCKER_INFLUXDB_INIT_ORG=test
+      - DOCKER_INFLUXDB_INIT_BUCKET=grpc
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=dG9rZW4xMjM0NQ==
+    secrets:
+      - influxdb2-admin-username
+      - influxdb2-admin-password
+      - influxdb2-admin-token
+    volumes:
+      - type: volume
+        source: influxdb2-data
+        target: /var/lib/influxdb2
+      - type: volume
+        source: influxdb2-config
+        target: /etc/influxdb2
+
+
+  telegraf:
+    image: telegraf
+    depends_on:
+      - influxdb2
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+    environment:
+      - HOST_PROC=/proc
+      - HOST_SYS=/sys
+      - HOST_ETC=/etc
+    links:
+      - influxdb2
+    restart: always
+    networks:
+      - default
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro 
+      - /etc/machine-id:/etc/machine-id:ro
+      - /mnt/windows_docker/:/rootfs/var/lib/docker:ro #https://github.com/vacp2p/wakurtosis/issues/58 for wsl
+    networks:
+      - default
+
+secrets:
+  influxdb2-admin-username:
+    file: ~/influxdb/.env.influxdb2-admin-username
+  influxdb2-admin-password:
+    file: ~/influxdb/.env.influxdb2-admin-password
+  influxdb2-admin-token:
+    file: ~/influxdb/.env.influxdb2-admin-token
+
+volumes:
+  grafana_data: {}
+  influxdb2-data:
+  influxdb2-config:
+  prometheus_data: {}
+
+networks:
+  default:
+    driver: bridge

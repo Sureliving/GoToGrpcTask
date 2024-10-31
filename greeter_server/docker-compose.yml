@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  greeter_server:
+    image: gotogrpc/greeter_server:1.0.2
+    ports:
+      - "50051:50051"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "2"
+          memory: "2G"
+    networks:
+      - default
+
+  telegraf:
+    image: telegraf:1.28.2-alpine
+    container_name: telegraf
+    restart: always
+    user: telegraf:1001
+    volumes:
+    - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    links:
+      - influxdb
+    ports:
+    - '8125:8125'
+    networks:
+      - default
+
+  influxdb:
+    image: influxdb:2.7.1-alpine
+    container_name: influxdb
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=inituser
+      - DOCKER_INFLUXDB_INIT_PASSWORD=initpass
+      - DOCKER_INFLUXDB_INIT_ORG=test
+      - DOCKER_INFLUXDB_INIT_BUCKET=bucket01
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb2
+      - ./influxdb/config:/etc/influxdb2
+    ports:
+      - '8086:8086'
+    networks:
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test: "curl -f http://localhost:8086/ping"
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana-server
+    restart: always
+    depends_on:
+      - influxdb
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    links:
+      - influxdb
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - default
+
+volumes:
+  grafana_data: {}
+  influxdb_data: {}
+  
+networks:
+  default:
+    driver: bridge

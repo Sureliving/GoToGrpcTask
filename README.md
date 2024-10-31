@@ -18,7 +18,7 @@
 
 5) Conduct stability testing of the service.
 
-6) Submit the results and a link to the repository containing:
+6) Submit the results and a link to the repository containing
 
    a) the test scenario,
 

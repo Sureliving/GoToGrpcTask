@@ -82,10 +82,10 @@ The client is containerized with dynamic port assignment for the HTTP trigger me
    The stability (reliability) test scenario involves prolonged testing over time using the load level identified at the previous step before server failure.
    
    b. The test results indicated that server failure was weakly correlated with resource utilization, and maximum resource usage could not be achieved during testing. However, when the interaction rate exceeded 100 requests per second, the server degraded. This was due to a well-known issue with this service—see https://github.com/grpc/grpc/issues/21386. Sources confirm that the actual number of channels in the interaction pool for this service is limited to 128, and upon reaching this limit, the service does not initiate new interactions until a channel is freed. Here is some tips for workaround with the issue https://grpc.io/docs/guides/performance/, but it could affect the server code.
+
+   ![Local image](monitoring/Tests.jpg)
    
    c. & d. Done.
-
-   ![Local image](monitoring\Tests.jpg)
    
    e. Fail. This tests was implemented in multi-instance environment (10 client containers and IDE on Windows), it will take time to collect all metrics.
 
